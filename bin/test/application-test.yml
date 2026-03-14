@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:15:///test_db?TC_INITSCRIPT=db/migration/V1__initial_schema.sql
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+  flyway:
+    enabled: false
+
+app:
+  google:
+    geocoding-api-key: test-key
+    places-api-key: test-key
+    distance-matrix-api-key: test-key
+  gemini:
+    api-key: test-key

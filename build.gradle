@@ -1,0 +1,88 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.4'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.neighbourhood'
+version = '1.0.0'
+sourceCompatibility = '17'
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // PostgreSQL + PostGIS
+    implementation 'org.postgresql:postgresql:42.7.3'
+    implementation 'org.hibernate.orm:hibernate-spatial:6.4.4.Final'
+    implementation 'org.locationtech.jts:jts-core:1.19.0'
+
+    // Geohash
+    implementation 'ch.hsr:geohash:1.4.0'
+
+    // HTTP Client
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // JSON
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+
+    // Google OAuth JWT verification
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.23.0'
+
+    // ShedLock — distributed scheduler lock (prevents double-run on multi-instance)
+    implementation 'net.javacrumbs.shedlock:shedlock-spring:5.10.0'
+    implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:5.10.0'
+
+    // Remove this:
+    implementation 'com.google.auth:google-auth-library-oauth2-http:1.23.0'
+
+// Add this instead:
+    implementation 'com.google.api-client:google-api-client:2.2.0'
+
+    // OpenAPI / Swagger UI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // MapStruct
+    implementation 'org.mapstruct:mapstruct:1.5.5.Final'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.5.5.Final'
+    annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+// With these:
+    implementation 'com.bucket4j:bucket4j-core:8.7.0'
+    implementation 'com.bucket4j:bucket4j-redis:8.7.0'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // Flyway
+    implementation 'org.flywaydb:flyway-core:9.22.3'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.named('compileJava') {
+    options.annotationProcessorPath = configurations.annotationProcessor
+}

@@ -1,0 +1,22 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+
+logging:
+  level:
+    com.neighbourhood: WARN
+    root: ERROR
+
+server:
+  tomcat:
+    max-threads: 200
+    accept-count: 100

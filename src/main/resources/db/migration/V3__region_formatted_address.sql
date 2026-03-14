@@ -1,0 +1,1 @@
+ALTER TABLE regions ADD COLUMN IF NOT EXISTS formatted_address VARCHAR(500);
