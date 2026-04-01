@@ -7,6 +7,7 @@ import com.neighbourhood.intelligence.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
@@ -27,8 +28,9 @@ public class GeminiLlmService {
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
 
+    @Cacheable(value = "locality", key = "'summary:' + #regionName")
     public String generateAreaSummary(String regionName, List<String> reviews) {
-        log.info("Generating AI summary from {} reviews", reviews.size());
+        log.info("🔎 [CACHE MISS] Generating AI summary from {} reviews", reviews.size());
 
         String reviewsText = String.join("\n- ", reviews);
         String prompt = """

@@ -7,6 +7,7 @@ import com.neighbourhood.intelligence.service.external.model.DistanceMatrixResul
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -24,10 +25,11 @@ public class GoogleDistanceMatrixService {
     private final WebClient googleWebClient;
     private final AppProperties appProperties;
 
+    @Cacheable(value = "geocoding", key = "T(String).format('distance:%.4f,%.4f:%.4f,%.4f:%b', #originLat, #originLng, #destLat, #destLng, #isPeak)")
     public DistanceMatrixResult getTravelTime(double originLat, double originLng,
                                               double destLat, double destLng,
                                               boolean isPeak) {
-        log.info("Fetching travel time: isPeak={}", isPeak);
+        log.info("🔎 [CACHE MISS] Fetching travel time: isPeak={}", isPeak);
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(appProperties.getGoogle().getDistanceMatrixBaseUrl())
                 .queryParam("origins", originLat + "," + originLng)

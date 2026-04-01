@@ -7,6 +7,7 @@ import com.neighbourhood.intelligence.service.external.model.PlaceResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -25,8 +26,13 @@ public class GooglePlacesService {
     private final WebClient googleWebClient;
     private final AppProperties appProperties;
 
+    /**
+     * Cached in Redis ("places" cache) keyed by rounded lat/lng + type + keyword.
+     * TTL = 7 days (configured in RedisConfig).
+     */
+    @Cacheable(value = "places", key = "T(String).format('%.4f,%.4f:%d:%s:%s', #lat, #lng, #radiusMeters, #type, #keyword)")
     public List<PlaceResult> searchNearby(double lat, double lng, int radiusMeters, String type, String keyword) {
-        log.info("Searching nearby places: type={}, keyword={}, lat={}, lng={}, radius={}", type, keyword, lat, lng, radiusMeters);
+        log.info("🔎 [CACHE MISS] Calling Google Places API: type={}, keyword={}, lat={}, lng={}, radius={}", type, keyword, lat, lng, radiusMeters);
 
         UriComponentsBuilder uriBuilder = UriComponentsBuilder
                 .fromHttpUrl(appProperties.getGoogle().getPlacesBaseUrl())
@@ -72,7 +78,7 @@ public class GooglePlacesService {
                 results.add(place);
             }
 
-            log.info("Found {} places of type {}", results.size(), type);
+            log.info("✅ Found {} places of type {} (will be cached)", results.size(), type);
             return results;
 
         } catch (ExternalApiException e) {
