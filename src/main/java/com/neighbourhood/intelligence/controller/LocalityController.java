@@ -33,4 +33,12 @@ public class LocalityController {
         LocalitySearchResponse response = localityService.getByRegionId(regionId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    @GetMapping("/{regionId}/summary")
+    public ResponseEntity<ApiResponse<LocalitySearchResponse>> getAiSummary(
+            @PathVariable Long regionId) {
+        log.info("GET /api/locality/{}/summary - Fetching lazy AI text", regionId);
+        LocalitySearchResponse response = localityService.getAiSummary(regionId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

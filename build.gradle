@@ -36,6 +36,7 @@ dependencies {
 
     // HTTP Client
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    runtimeOnly 'io.netty:netty-resolver-dns-native-macos:4.1.107.Final:osx-aarch_64'
 
     // JSON
     implementation 'com.fasterxml.jackson.core:jackson-databind'
