@@ -79,8 +79,8 @@ public class LocalityServiceImpl implements LocalityService {
         }
 
         refreshTrafficIfStale(region, now, trafficTtlDays);
-        refreshSummaryIfStale(region, now, summaryTtlDays);
 
+        // We no longer trigger refreshSummaryIfStale here; it is lazy-loaded via getAiSummary(Long)
         regionDataService.recalculateScores(region);
         Long regionId = region.getId();
         Region refreshedRegion = regionRepository.findByIdWithDetails(regionId)
@@ -108,9 +108,30 @@ public class LocalityServiceImpl implements LocalityService {
         }
 
         refreshTrafficIfStale(region, now, trafficTtlDays);
-        refreshSummaryIfStale(region, now, summaryTtlDays);
+        // We no longer trigger refreshSummaryIfStale here; it is lazy-loaded via getAiSummary(Long)
+        
         regionDataService.recalculateScores(region);
 
+        Region refreshedRegion = regionRepository.findByIdWithDetails(regionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Region", regionId));
+
+        return buildResponse(refreshedRegion);
+    }
+
+    @Override
+    @Transactional
+    public LocalitySearchResponse getAiSummary(Long regionId) {
+        Region region = regionRepository.findByIdWithDetails(regionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Region", regionId));
+
+        ZonedDateTime now = ZonedDateTime.now();
+        int summaryTtlDays = appProperties.getCache().getSummaryTtlDays();
+
+        // 1. Always demand fetch or refresh the AI summary here
+        log.info("Lazy loading AI Summary invoked for region {}", regionId);
+        refreshSummaryIfStale(region, now, summaryTtlDays);
+
+        // 2. Return the rebuilt full payload (includes fresh summary string)
         Region refreshedRegion = regionRepository.findByIdWithDetails(regionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Region", regionId));
 

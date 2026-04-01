@@ -19,9 +19,12 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.ZonedDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -78,18 +81,25 @@ public class RegionDataServiceImpl implements RegionDataService {
         double lng    = region.getCentroidLng();
         int    radius = appProperties.getSearch().getRadiusMeters();
 
-        List<Facility> facilities    = new ArrayList<>();
-        int            failureCount  = 0;
+        CompletableFuture<List<Facility>> fSchools   = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, radius, "school", "school", FacilityType.SCHOOL, Integer.MAX_VALUE));
+        CompletableFuture<List<Facility>> fHospitals = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, radius, null, "hospital", FacilityType.HOSPITAL, Integer.MAX_VALUE));
+        CompletableFuture<List<Facility>> fGroceries = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, radius, null, "grocery_or_supermarket", FacilityType.GROCERY_STORE, Integer.MAX_VALUE));
+        CompletableFuture<List<Facility>> fMalls     = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, radius, "mall", "shopping_mall", FacilityType.MALL, Integer.MAX_VALUE));
+        CompletableFuture<List<Facility>> fAirports  = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, 50000, "airport", "airport", FacilityType.AIRPORT, 1));
+        CompletableFuture<List<Facility>> fSubways   = CompletableFuture.supplyAsync(() -> fetchPlacesList(region, lat, lng, radius, null, "subway_station", FacilityType.METRO_STATION, 2));
 
-        if (!fetchAndSavePlaces(region, lat, lng, radius, "school", "school",                 FacilityType.SCHOOL,        facilities, Integer.MAX_VALUE)) failureCount++;
-        if (!fetchAndSavePlaces(region, lat, lng, radius, null, "hospital",               FacilityType.HOSPITAL,      facilities, Integer.MAX_VALUE)) failureCount++;
-        if (!fetchAndSavePlaces(region, lat, lng, radius, null, "grocery_or_supermarket", FacilityType.GROCERY_STORE, facilities, Integer.MAX_VALUE)) failureCount++;
-        if (!fetchAndSavePlaces(region, lat, lng, radius, "mall", "shopping_mall",          FacilityType.MALL,          facilities, Integer.MAX_VALUE)) failureCount++;
-        if (!fetchAndSavePlaces(region, lat, lng, 50000, "airport", "airport",                FacilityType.AIRPORT,       facilities, 1))                 failureCount++;
-        if (!fetchAndSavePlaces(region, lat, lng, radius, null, "subway_station",         FacilityType.METRO_STATION, facilities, 2))                 failureCount++;
+        CompletableFuture.allOf(fSchools, fHospitals, fGroceries, fMalls, fAirports, fSubways).join();
 
-        if (failureCount == 6 && !existingFacilities.isEmpty()) {
-            log.warn("All Places API calls failed for region {} — restoring previous data", region.getGeohash());
+        List<Facility> facilities = new ArrayList<>();
+        facilities.addAll(fSchools.join());
+        facilities.addAll(fHospitals.join());
+        facilities.addAll(fGroceries.join());
+        facilities.addAll(fMalls.join());
+        facilities.addAll(fAirports.join());
+        facilities.addAll(fSubways.join());
+
+        if (facilities.isEmpty() && !existingFacilities.isEmpty()) {
+            log.warn("All Places API calls returned empty for region {} — restoring previous data", region.getGeohash());
             existingFacilities.forEach(f -> f.setId(null));
             facilityRepository.saveAll(existingFacilities);
             return;
@@ -102,35 +112,27 @@ public class RegionDataServiceImpl implements RegionDataService {
         regionRepository.save(region);
     }
 
-    private boolean fetchAndSavePlaces(Region region, double lat, double lng, int radius,
-                                       String keyword, String googleType, FacilityType facilityType,
-                                       List<Facility> result, int limit) {
+    private List<Facility> fetchPlacesList(Region region, double lat, double lng, int radius,
+                                           String keyword, String googleType, FacilityType facilityType, int limit) {
         try {
-            List<PlaceResult> places = googlePlacesService.searchNearby(lat, lng, radius, googleType, keyword);
-            places.stream()
-                    .sorted(Comparator.comparingDouble(p ->
-                            HaversineUtil.distanceMeters(lat, lng, p.getLat(), p.getLng())))
+            return googlePlacesService.searchNearby(lat, lng, radius, googleType, keyword).stream()
+                    .sorted(Comparator.comparingDouble(p -> HaversineUtil.distanceMeters(lat, lng, p.getLat(), p.getLng())))
                     .limit(limit)
-                    .forEach(p -> {
-                        double distM = HaversineUtil.distanceMeters(lat, lng, p.getLat(), p.getLng());
-                        Point  point = GeometryUtil.createPoint(p.getLat(), p.getLng());
-                        Region managedRegion = regionRepository.getReferenceById(region.getId());
-                        result.add(Facility.builder()
-                                .region(managedRegion)
-                                .placeId(p.getPlaceId())
-                                .name(p.getName())
-                                .facilityType(facilityType.name())
-                                .lat(p.getLat())
-                                .lng(p.getLng())
-                                .locationPoint(point)
-                                .rating(p.getRating())
-                                .distanceMeters(distM)
-                                .build());
-                    });
-            return true;
+                    .map(p -> Facility.builder()
+                            .region(region)
+                            .placeId(p.getPlaceId())
+                            .name(p.getName())
+                            .facilityType(facilityType.name())
+                            .lat(p.getLat())
+                            .lng(p.getLng())
+                            .locationPoint(GeometryUtil.createPoint(p.getLat(), p.getLng()))
+                            .rating(p.getRating())
+                            .distanceMeters(HaversineUtil.distanceMeters(lat, lng, p.getLat(), p.getLng()))
+                            .build())
+                    .collect(Collectors.toList());
         } catch (ExternalApiException e) {
             log.warn("Failed to fetch {} places: {}", googleType, e.getMessage());
-            return false;
+            return Collections.emptyList();
         }
     }
 
@@ -193,8 +195,19 @@ public class RegionDataServiceImpl implements RegionDataService {
                 log.warn("Hub lookup failed for region {}, using centroid: {}", region.getGeohash(), e.getMessage());
             }
 
-            DistanceMatrixResult baseline = distanceMatrixService.getTravelTime(lat, lng, hubLat, hubLng, false);
-            DistanceMatrixResult peak     = distanceMatrixService.getTravelTime(lat, lng, hubLat, hubLng, true);
+            final double fLat = hubLat;
+            final double fLng = hubLng;
+
+            // Run Distance Matrix calls in Parallel
+            CompletableFuture<DistanceMatrixResult> baselineFuture = CompletableFuture.supplyAsync(() -> 
+                distanceMatrixService.getTravelTime(lat, lng, fLat, fLng, false)
+            );
+            CompletableFuture<DistanceMatrixResult> peakFuture = CompletableFuture.supplyAsync(() -> 
+                distanceMatrixService.getTravelTime(lat, lng, fLat, fLng, true)
+            );
+
+            DistanceMatrixResult baseline = baselineFuture.join();
+            DistanceMatrixResult peak     = peakFuture.join();
 
             double     multiplier      = baseline.getDurationSeconds() > 0
                     ? (double) peak.getDurationSeconds() / baseline.getDurationSeconds() : 1.0;
